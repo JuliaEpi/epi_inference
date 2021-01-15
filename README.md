@@ -11,10 +11,8 @@ transistion matrix. Other methods based on particle filters are in the pipeline.
 ## Examples
 
 1. [Forward equation approach](SIR_examples.md)
-
+2. [Alive particle filter](SIR_alive.jl)
 
 ## todo
 
-1. Alive particle filter.
-2. Importance sampling particle filter.
-3. Data-augmented method.
+1. Importance sampling particle filter.
