@@ -1,3 +1,8 @@
+---
+author: "Andrew Black"
+title: "SIR CTMC inference example"
+date: "5th June 2020"
+---
 
 
 # SIR CTMC inference example
@@ -15,14 +20,17 @@ We then use the the AdvancedMH package to do the MCMC.
 using Random, Distributions
 using AdvancedMH, MCMCChains
 using Plots, StatsBase, StatsPlots
-include("SIR_noQ.jl")
+include("SIR_noQ.jl");
 ~~~~~~~~~~~~~
+
+
 
 
 Simulate some test data
 ~~~~{.julia}
 Random.seed!(7)
-data = SIR_sim(100,2.0/3,1/3)
+N = 100
+data = SIR_sim(N,2.0/3,1/3)
 
 Z1_obs = data[1][1:end-5] # truncate after last obs.
 Z2_obs = data[2][3:end]   # truncate until first obs.
@@ -31,7 +39,6 @@ plot!(data[2],label = "recoveries")
 xlabel!("time (days)")
 ylabel!("cumulative number of events")
 ~~~~~~~~~~~~~
-
 
 ![](figures/SIR_examples_2_1.png)\ 
 
@@ -45,6 +52,8 @@ This version uses the number of infection events on each day.
 
 
 
+## Using the exact likelihood
+
 Setup the likelihood function and proposal distribution. 
 The covariance matrix was determined from a pilot run
 
@@ -53,7 +62,7 @@ function density(theta)
     if  theta[1] < 0 || theta[2] < 0
         return -Inf
     else
-        return likelihood_tight(theta[1]/theta[2],1/theta[2],Z1_obs,100)
+        return likelihood_tight(theta[1]/theta[2],1/theta[2],Z1_obs,N)
     end
 end
 
@@ -64,6 +73,34 @@ chain = sample(model, rw_prop, 10^4; param_names=["R0", "1/\\gamma"], chain_type
 plot(chain)
 ~~~~~~~~~~~~~
 
-
 ![](figures/SIR_examples_4_1.png)\ 
+
+
+
+
+## Using importance sampling
+
+A faster method uses a particle filter, with importance sampling designed so that simulations
+always match the observations. This is described in [Black, 2019](https://dx.doi.org/10.1007/s11222-018-9827-1).
+Notice how we can get away with using many less particles. 
+
+~~~~{.julia}
+include("SIR_IS.jl")
+daily_counts = diff([1;Z1_obs]) # careful not to count initial case. 
+function density(theta)
+    if  theta[1] < 0 || theta[2] < 0
+        return -Inf
+    else
+        return SIR_likelihood_is(N,theta[1]/theta[2],1/theta[2],daily_counts,10)
+    end
+end
+
+C = [ 0.130982  0.190005; 0.190005  1.0076]
+rw_prop = RWMH(MvNormal(0.5*C))
+model = DensityModel(density)
+chain = sample(model, rw_prop, 10^4; param_names=["R0", "1/\\gamma"], chain_type=Chains, init_params=[2.5,2.0]);
+plot(chain)
+~~~~~~~~~~~~~
+
+![](figures/SIR_examples_5_1.png)\ 
 
